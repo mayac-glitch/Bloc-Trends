@@ -645,6 +645,9 @@ function renderChart(){
           bodyFont: { family:'Heebo', size: 12 },
           padding: 10,
           cornerRadius: 8,
+          itemSort: state.mode === 'stacked'
+            ? (a, b) => b.datasetIndex - a.datasetIndex
+            : undefined,
           callbacks: {
             label: ctx => `${ctx.dataset.label}: ${ctx.formattedValue}%`
           }
