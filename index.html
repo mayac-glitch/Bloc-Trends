@@ -192,6 +192,12 @@
     margin-bottom:8px;
   }
   .method-group-head .sw{ width:11px; height:11px; border-radius:3px; flex:none; }
+  .bloc-subtotal{
+    margin-right:auto;
+    font-size:13px;
+    font-weight:700;
+    color:var(--ink-soft);
+  }
   .method-group ul{
     margin:0;
     padding-right:19px;
@@ -203,6 +209,23 @@
     font-size:13.5px;
     color:var(--ink);
     line-height:1.4;
+  }
+  .survey-list{
+    padding-right:0 !important;
+  }
+  .survey-list li{
+    display:flex;
+    justify-content:space-between;
+    gap:10px;
+    list-style:none;
+    padding:5px 0;
+    border-bottom:1px solid var(--line);
+  }
+  .survey-list li:last-child{ border-bottom:none; }
+  .survey-list .pct{
+    font-weight:700;
+    font-variant-numeric:tabular-nums;
+    white-space:nowrap;
   }
   .method-table{
     width:100%;
@@ -299,6 +322,12 @@
     gap:8px;
     padding:16px 4px 6px;
   }
+  .click-hint{
+    font-size:12px;
+    color:var(--ink-soft);
+    padding:2px 4px 4px;
+    margin:0;
+  }
   .chip{
     display:inline-flex;
     align-items:center;
@@ -392,6 +421,7 @@
     <p class="chart-note" id="chartNote"></p>
     <div class="chart-wrap"><canvas id="mainChart"></canvas></div>
     <div class="legend" id="legend"></div>
+    <p class="click-hint">טיפ: לחיצה על עמודת/נקודת ספטמבר מציגה את פילוח ההצבעה המלא מהסקר האחרון.</p>
   </div>
 
   <footer>
@@ -487,6 +517,30 @@ const chart2Logic = [
   { a:'אחר', b:'כל חלופה',                                group:'מיואשים' },
   { a:'לא מצביע', b:'כל חלופה',                           group:'לא מצביעים' },
 ];
+
+const septemberSurvey = {
+  question: 'במידה והבחירות היו מתקיימות מחר לאיזה מפלגה היית מצביע?',
+  rows: [
+    { party:'ישר! בראשות גדי איזנקוט', pct:18.8, bloc:'אופוזיציה' },
+    { party:'הליכוד בראשות בנימין נתניהו', pct:14.1, bloc:'קואליציה' },
+    { party:'ביחד (איחוד בנט 2026 ויש עתיד) בראשות נפתלי בנט', pct:12.3, bloc:'אופוזיציה' },
+    { party:'הדמוקרטים בראשות יאיר גולן', pct:7.9, bloc:'אופוזיציה' },
+    { party:'ישראל ביתנו בראשות אביגדור ליברמן', pct:6.5, bloc:'אופוזיציה' },
+    { party:'עוצמה יהודית בראשות איתמר בן-גביר', pct:6.1, bloc:'קואליציה' },
+    { party:'לא הייתי מצביע', pct:6.3, bloc:'אחר / לא הייתי מצביע' },
+    { party:'עמך ישראל (מפלגת וינטר-חדאד) בראשות עופר וינטר', pct:5.3, bloc:'קואליציה' },
+    { party:'יהדות התורה בראשות יצחק גולדקנופף', pct:4.8, bloc:'קואליציה' },
+    { party:'ש״ס בראשות אריה דרעי', pct:4.1, bloc:'קואליציה' },
+    { party:'הציונות הדתית בראשות בצלאל סמוטריץ', pct:3.7, bloc:'קואליציה' },
+    { party:'אחר', pct:3.1, bloc:'אחר / לא הייתי מצביע' },
+    { party:'המפלגה הכלכלית בראשות ירון זליכה', pct:2.9, bloc:'גוש שלישי' },
+    { party:'בית ציוני בראשות חילי טרופר ויועז הנדל', pct:2.0, bloc:'גוש שלישי' },
+    { party:'המחנה הממלכתי (כחול לבן) בראשות בני גנץ', pct:1.0, bloc:'גוש שלישי' },
+    { party:'האחדות (מפלגת ארדן - אדלשטיין) בראשות גלעד ארדן', pct:0.8, bloc:'גוש שלישי' },
+    { party:'חד״ש-תע״ל-בל״ד בראשות יוסף ג׳אברין', pct:0.2, bloc:'אופוזיציה' },
+    { party:'רע״מ בראשות מנסור עבאס', pct:0.1, bloc:'אופוזיציה' },
+  ].sort((a,b) => b.pct - a.pct)
+};
 
 function groupColor(name){
   const has = k => name.indexOf(k) !== -1;
@@ -635,6 +689,17 @@ function renderChart(){
       rtl: false,
       interaction: { mode: 'index', intersect: false },
       animation: { duration: 350 },
+      onHover: (evt, elements, chart) => {
+        const points = chart.getElementsAtEventForMode(evt, 'index', { intersect: false }, false);
+        const isSeptember = points.length && points[0].index === data.categories.length - 1;
+        chart.canvas.style.cursor = isSeptember ? 'pointer' : 'default';
+      },
+      onClick: (evt, elements, chart) => {
+        const points = chart.getElementsAtEventForMode(evt, 'index', { intersect: false }, false);
+        if(points.length && points[0].index === data.categories.length - 1){
+          renderSeptemberSurvey();
+        }
+      },
       plugins: {
         legend: { display:false },
         tooltip: {
@@ -733,26 +798,32 @@ document.getElementById('modeTabs').addEventListener('click', e => {
   renderChart();
 });
 
-/* ===================== METHODOLOGY MODAL ===================== */
-function renderMethodology(){
-  const overlay = document.getElementById('methodOverlay');
-  const title = document.getElementById('methodTitle');
-  const sub = document.getElementById('methodSub');
-  const body = document.getElementById('methodBody');
+/* ===================== MODAL (shared) ===================== */
+function openModal(title, sub, bodyHtml){
+  document.getElementById('methodTitle').textContent = title;
+  document.getElementById('methodSub').textContent = sub;
+  document.getElementById('methodBody').innerHTML = bodyHtml;
+  document.getElementById('methodOverlay').hidden = false;
+}
+function closeMethodology(){
+  document.getElementById('methodOverlay').hidden = true;
+}
 
+function renderMethodology(){
   if(state.chart === 1){
-    title.textContent = 'מתודולוגיה — חלוקה לגושים לפי הצבעת עבר';
-    sub.textContent = 'כל מפלגה משויכת לאחד מארבעת הגושים לפי כוונת ההצבעה שדווחה בסקר.';
-    body.innerHTML = chart1Methodology.map(b => `
+    const body = chart1Methodology.map(b => `
       <div class="method-group">
         <div class="method-group-head"><span class="sw" style="background:${b.color}"></span>${b.bloc}</div>
         <ul>${b.items.map(i => `<li>${i}</li>`).join('')}</ul>
       </div>
     `).join('');
+    openModal(
+      'מתודולוגיה — חלוקה לגושים לפי הצבעת עבר',
+      'כל מפלגה משויכת לאחד מארבעת הגושים לפי כוונת ההצבעה שדווחה בסקר.',
+      body
+    );
   } else {
-    title.textContent = 'מתודולוגיה — הגדרת הקבוצות לפי חלופה שנייה';
-    sub.textContent = 'כל משיב מסווג לקבוצה לפי השילוב בין כוונת ההצבעה שלו (חלופה 1) לבין החלופה השנייה שציין.';
-    body.innerHTML = `
+    const body = `
       <table class="method-table">
         <thead>
           <tr><th>כוונת הצבעה (חלופה 1)</th><th>חלופה שנייה</th><th>קבוצה</th></tr>
@@ -768,12 +839,45 @@ function renderMethodology(){
         </tbody>
       </table>
     `;
+    openModal(
+      'מתודולוגיה — הגדרת הקבוצות לפי חלופה שנייה',
+      'כל משיב מסווג לקבוצה לפי השילוב בין כוונת ההצבעה שלו (חלופה 1) לבין החלופה השנייה שציין.',
+      body
+    );
   }
-
-  overlay.hidden = false;
 }
-function closeMethodology(){
-  document.getElementById('methodOverlay').hidden = true;
+
+function renderSeptemberSurvey(){
+  const blocMeta = [
+    { name:'קואליציה', color:'#C1622D' },
+    { name:'אופוזיציה', color:'#2C4870' },
+    { name:'גוש שלישי', color:'#4F8076' },
+    { name:'אחר / לא הייתי מצביע', color:'#6B7280' },
+  ];
+
+  const body = blocMeta.map(b => {
+    const rows = septemberSurvey.rows
+      .filter(r => r.bloc === b.name)
+      .sort((x, y) => y.pct - x.pct);
+    const subtotal = rows.reduce((sum, r) => sum + r.pct, 0);
+    return `
+      <div class="method-group">
+        <div class="method-group-head">
+          <span class="sw" style="background:${b.color}"></span>${b.name}
+          <span class="bloc-subtotal">${subtotal.toFixed(1)}%</span>
+        </div>
+        <ul class="survey-list">
+          ${rows.map(r => `<li><span>${r.party}</span><span class="pct">${r.pct.toFixed(1)}%</span></li>`).join('')}
+        </ul>
+      </div>
+    `;
+  }).join('');
+
+  openModal(
+    'הנתונים המלאים — סקר ספטמבר, לפי גוש',
+    septemberSurvey.question,
+    body
+  );
 }
 
 document.getElementById('methodologyBtn').addEventListener('click', renderMethodology);
